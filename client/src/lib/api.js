@@ -27,6 +27,9 @@ export const api = {
   login: (username, password) =>
     request("/api/admin/login", { method: "POST", body: JSON.stringify({ username, password }) }),
 
+  signup: (username, password) =>
+    request("/api/admin/signup", { method: "POST", body: JSON.stringify({ username, password }) }),
+
   logout: () => request("/api/admin/logout", { method: "POST" }),
 
   session: () => request("/api/admin/session"),

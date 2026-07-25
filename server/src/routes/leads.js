@@ -7,7 +7,7 @@ import { requireAdmin } from "../middleware/requireAdmin.js";
 const router = Router();
 
 // POST /api/leads - public submission endpoint
-router.post("/", async(req, res) => {
+router.post("/", async (req, res) => {
   // Honeypot: real visitors never fill this field in. Bots that fill every
   // field usually do. Pretend success so the bot doesn't learn anything.
   if (req.body?.company) {
@@ -23,16 +23,8 @@ router.post("/", async(req, res) => {
   const id = crypto.randomUUID();
   const created_at = new Date().toISOString();
 
-  // Insert lead using Supabase helper
-  const leadData = {
-    id,
-    name,
-    email,
-    budget_range,
-    message,
-    status: "New",
-    created_at,
-  };
+  const leadData = { id, name, email, budget_range, message, status: "New", created_at };
+
   try {
     const lead = await insertLead(leadData);
     res.status(201).json(lead);
@@ -55,19 +47,18 @@ router.get("/", requireAdmin, async (req, res) => {
 });
 
 // PATCH /api/leads/:id - admin only, updates status
-router.patch("/:id", requireAdmin,async (req, res) => {
+router.patch("/:id", requireAdmin, async (req, res) => {
   const parsed = statusUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ errors: parsed.error.flatten().fieldErrors });
   }
 
-  // Verify lead exists via Supabase
-  const existing = await getLeadById(req.params.id);
-  if (!existing) {
-    return res.status(404).json({ error: "Lead not found" });
-  }
-
   try {
+    const existing = await getLeadById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
     const updated = await updateLeadStatus(req.params.id, parsed.data.status);
     res.json(updated);
   } catch (err) {

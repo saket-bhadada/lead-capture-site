@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import {
   getAdminByUsername,
+  insertAdmin,
   insertSession,
   deleteSession,
   getSessionById,
@@ -103,6 +104,37 @@ router.get("/session", async (req, res) => {
     res.json({ authenticated: true });
   } catch {
     res.json({ authenticated: false });
+  }
+});
+
+// POST /api/admin/signup — create a new admin user
+router.post("/signup", async (req, res) => {
+  const { username, password } = req.body ?? {};
+
+  if (!username || !password) {
+    return res.status(400).json({ error: "Username and password are required" });
+  }
+
+  try {
+    const existingAdmin = await getAdminByUsername(username);
+    if (existingAdmin) {
+      return res.status(409).json({ error: "Username already exists" });
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+    const id = crypto.randomUUID();
+
+    await insertAdmin({
+      id,
+      username,
+      email: "", // email not used currently
+      password_hash,
+    });
+
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error("[Admin Signup Error]", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

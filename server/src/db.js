@@ -6,35 +6,53 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY =
   process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
+let supabase = null;
+let configError = null;
+
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  throw new Error(
-    "SUPABASE_URL or SUPABASE_SECRET_KEY / SUPABASE_PUBLISHABLE_KEY not set. " +
-    "Set these in your hosting platform's environment variables."
-  );
+  configError =
+    "SUPABASE_URL or SUPABASE_SECRET_KEY / SUPABASE_PUBLISHABLE_KEY is not set. " +
+    "Set these in your hosting platform's environment variables.";
+  console.error(`[Supabase] ${configError}`);
+} else {
+  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Every DB function calls this first. If Supabase isn't configured, this
+// throws a clear per-request error instead of crashing the whole process
+// at import time (which is what happened before this fix).
+function requireSupabase() {
+  if (!supabase) {
+    const err = new Error(configError || "Supabase is not configured.");
+    err.isConfigError = true;
+    throw err;
+  }
+  return supabase;
+}
 
 // ─── Lead helpers ───────────────────────────────────────────────────────────
 
 export async function insertLead(lead) {
-  const { data, error } = await supabase.from("leads").insert(lead).single();
+  const db = requireSupabase();
+  const { data, error } = await db.from("leads").insert(lead).select().single();
   if (error) throw error;
   return data;
 }
 
 export async function getLeadById(id) {
-  const { data, error } = await supabase
+  const db = requireSupabase();
+  const { data, error } = await db
     .from("leads")
     .select("*")
     .eq("id", id)
-    .single();
+    .maybeSingle();
   if (error) throw error;
   return data;
 }
 
 export async function getLeads({ search, status } = {}) {
-  let query = supabase.from("leads").select("*");
+  const db = requireSupabase();
+  let query = db.from("leads").select("*");
   if (search) {
     const term = `%${search}%`;
     query = query.or(`name.ilike.${term},email.ilike.${term},message.ilike.${term}`);
@@ -48,10 +66,12 @@ export async function getLeads({ search, status } = {}) {
 }
 
 export async function updateLeadStatus(id, status) {
-  const { data, error } = await supabase
+  const db = requireSupabase();
+  const { data, error } = await db
     .from("leads")
     .update({ status })
     .eq("id", id)
+    .select()
     .single();
   if (error) throw error;
   return data;
@@ -60,17 +80,19 @@ export async function updateLeadStatus(id, status) {
 // ─── Admin user helpers ─────────────────────────────────────────────────────
 
 export async function getAdminByUsername(username) {
-  const { data, error } = await supabase
+  const db = requireSupabase();
+  const { data, error } = await db
     .from("admin_users")
     .select("*")
     .eq("username", username)
-    .single();
-  if (error && error.code !== "PGRST116") throw error; // PGRST116 = no rows
+    .maybeSingle();
+  if (error) throw error;
   return data ?? null;
 }
 
 export async function countAdmins() {
-  const { count, error } = await supabase
+  const db = requireSupabase();
+  const { count, error } = await db
     .from("admin_users")
     .select("*", { count: "exact", head: true });
   if (error) throw error;
@@ -78,9 +100,11 @@ export async function countAdmins() {
 }
 
 export async function insertAdmin({ id, username, email, password_hash }) {
-  const { data, error } = await supabase
+  const db = requireSupabase();
+  const { data, error } = await db
     .from("admin_users")
     .insert({ id, username, email, password_hash })
+    .select()
     .single();
   if (error) throw error;
   return data;
@@ -89,88 +113,67 @@ export async function insertAdmin({ id, username, email, password_hash }) {
 // ─── Session helpers ────────────────────────────────────────────────────────
 
 export async function insertSession({ id, admin_id, token, created_at, expires_at }) {
-  const { data, error } = await supabase
+  const db = requireSupabase();
+  const { data, error } = await db
     .from("sessions")
     .insert({ id, admin_id, token, created_at, expires_at })
+    .select()
     .single();
   if (error) throw error;
   return data;
 }
 
 export async function getSessionById(id) {
-  const { data, error } = await supabase
+  const db = requireSupabase();
+  const { data, error } = await db
     .from("sessions")
     .select("*")
     .eq("id", id)
-    .single();
-  if (error && error.code !== "PGRST116") throw error;
+    .maybeSingle();
+  if (error) throw error;
   return data ?? null;
 }
 
 export async function deleteSession(id) {
-  const { error } = await supabase.from("sessions").delete().eq("id", id);
+  const db = requireSupabase();
+  const { error } = await db.from("sessions").delete().eq("id", id);
   if (error) throw error;
 }
 
 export async function deleteExpiredSessions() {
+  if (!supabase) return; // nothing to clean up if not configured yet
   const { error } = await supabase
     .from("sessions")
     .delete()
     .lt("expires_at", new Date().toISOString());
-  if (error) {
-    if (error.code !== "PGRST205") {
-      console.warn("[Supabase] Failed to clean expired sessions:", error.message);
-    }
-  }
-}
-
-// ─── Table Initialization ───────────────────────────────────────────────────
-
-export async function ensureTables() {
-  const createTablesSQL = `
-    CREATE TABLE IF NOT EXISTS leads (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL,
-      budget_range TEXT NOT NULL,
-      message TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'New' CHECK (status IN ('New', 'Contacted', 'Closed')),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE IF NOT EXISTS admin_users (
-      id TEXT PRIMARY KEY,
-      username TEXT UNIQUE NOT NULL,
-      email TEXT NOT NULL DEFAULT '',
-      password_hash TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      admin_id TEXT NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
-      token TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      expires_at TIMESTAMPTZ NOT NULL
-    );
-  `;
-
-  try {
-    const { error } = await supabase.rpc("sql", { query: createTablesSQL });
-    if (error) {
-      if (error.code === 'PGRST202') {
-         // RPC 'sql' does not exist. We just return false and let the other functions warn.
-         return false;
-      }
-      console.warn("[Supabase] ensureTables error:", error.message);
-    }
-    return true;
-  } catch (e) {
-    return false;
+  if (error && error.code !== "PGRST205") {
+    console.warn("[Supabase] Failed to clean expired sessions:", error.message);
   }
 }
 
 // ─── First-run admin seed ───────────────────────────────────────────────────
+//
+// NOTE: this does NOT create tables. Supabase does not expose a generic
+// raw-SQL RPC by default, so auto-creating tables from application code
+// isn't reliable. Run supabase-schema.sql in your Supabase project's SQL
+// editor once, manually, before the first deploy. This function just seeds
+// the first admin user once those tables already exist.
+
+export async function ensureTables() {
+  if (!supabase) return false;
+  const { error } = await supabase.from("leads").select("id").limit(1);
+  if (error && error.code === "PGRST205") {
+    console.warn("");
+    console.warn("\u26a0\ufe0f  Database tables not found.");
+    console.warn(
+      "   Run supabase-schema.sql in your Supabase project's SQL editor,"
+    );
+    console.warn("   then redeploy.");
+    console.warn("");
+    return false;
+  }
+  return true;
+}
 
 export async function seedAdmin() {
   try {
@@ -189,16 +192,18 @@ export async function seedAdmin() {
     });
 
     console.log("");
-    console.log("┌─────────────────────────────────────────────┐");
-    console.log("│  First Admin User Created                   │");
-    console.log(`│  Username: admin                            │`);
-    console.log(`│  Password: ${plainPassword}   │`);
-    console.log("│  Change this immediately in /admin          │");
-    console.log("└─────────────────────────────────────────────┘");
+    console.log("\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510");
+    console.log("\u2502  First Admin User Created                   \u2502");
+    console.log(`\u2502  Username: admin                            \u2502`);
+    console.log(`\u2502  Password: ${plainPassword}   \u2502`);
+    console.log("\u2502  Change this immediately in /admin          \u2502");
+    console.log("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518");
     console.log("");
   } catch (e) {
     if (e.code === "PGRST205") {
-      console.warn("⚠️  Database tables not found. Please run the SQL setup script in your Supabase dashboard.");
+      console.warn(
+        "\u26a0\ufe0f  Database tables not found. Run supabase-schema.sql in your Supabase dashboard, then redeploy."
+      );
     } else {
       console.warn("[Supabase] Admin seeding skipped or failed:", e.message);
     }
