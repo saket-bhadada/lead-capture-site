@@ -42,6 +42,7 @@ Run this SQL in **Supabase Dashboard → SQL Editor**:
 ```sql
 CREATE TABLE IF NOT EXISTS leads (
   id TEXT PRIMARY KEY,
+  client_id TEXT,
   name TEXT NOT NULL,
   email TEXT NOT NULL,
   budget_range TEXT NOT NULL,
@@ -51,11 +52,21 @@ CREATE TABLE IF NOT EXISTS leads (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS client_id TEXT;
+
 CREATE TABLE IF NOT EXISTS admin_users (
   id TEXT PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   email TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS client_users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
