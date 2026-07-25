@@ -22,7 +22,7 @@ app.use(cookieParser());
 try {
   const { default: leadsRouter } = await import("./routes/leads.js");
   const { default: adminRouter } = await import("./routes/admin.js");
-  const { seedAdmin } = await import("./db.js");
+  const { seedAdmin, ensureTables, deleteExpiredSessions } = await import("./db.js");
 
   app.use("/api/leads", leadsRouter);
   app.use("/api/admin", adminRouter);
@@ -38,7 +38,9 @@ try {
     });
   }
 
-  // Seed first admin user if none exist
+  // Auto-create tables (if supported by Supabase instance), cleanup, and seed admin
+  await ensureTables();
+  deleteExpiredSessions();
   seedAdmin();
 
 } catch (error) {

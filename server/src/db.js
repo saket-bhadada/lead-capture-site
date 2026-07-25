@@ -117,7 +117,57 @@ export async function deleteExpiredSessions() {
     .from("sessions")
     .delete()
     .lt("expires_at", new Date().toISOString());
-  if (error) console.warn("[Supabase] Failed to clean expired sessions:", error.message);
+  if (error) {
+    if (error.code !== "PGRST205") {
+      console.warn("[Supabase] Failed to clean expired sessions:", error.message);
+    }
+  }
+}
+
+// ─── Table Initialization ───────────────────────────────────────────────────
+
+export async function ensureTables() {
+  const createTablesSQL = `
+    CREATE TABLE IF NOT EXISTS leads (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      budget_range TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'New' CHECK (status IN ('New', 'Contacted', 'Closed')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      email TEXT NOT NULL DEFAULT '',
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      admin_id TEXT NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+      token TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      expires_at TIMESTAMPTZ NOT NULL
+    );
+  `;
+
+  try {
+    const { error } = await supabase.rpc("sql", { query: createTablesSQL });
+    if (error) {
+      if (error.code === 'PGRST202') {
+         // RPC 'sql' does not exist. We just return false and let the other functions warn.
+         return false;
+      }
+      console.warn("[Supabase] ensureTables error:", error.message);
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 // ─── First-run admin seed ───────────────────────────────────────────────────
@@ -147,9 +197,10 @@ export async function seedAdmin() {
     console.log("└─────────────────────────────────────────────┘");
     console.log("");
   } catch (e) {
-    console.warn("[Supabase] Admin seeding skipped or failed:", e.message);
+    if (e.code === "PGRST205") {
+      console.warn("⚠️  Database tables not found. Please run the SQL setup script in your Supabase dashboard.");
+    } else {
+      console.warn("[Supabase] Admin seeding skipped or failed:", e.message);
+    }
   }
 }
-
-// Clean up expired sessions on startup
-deleteExpiredSessions();
