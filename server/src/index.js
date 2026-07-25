@@ -12,7 +12,9 @@ import { seedAdmin, ensureTables, deleteExpiredSessions } from "./db.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+const IS_VERCEL = !!process.env.VERCEL;
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN
+  || (IS_VERCEL && process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5173");
 
 if (!process.env.JWT_SECRET) {
   console.warn(
@@ -29,10 +31,9 @@ app.use("/api/admin", adminRouter);
 app.use("/api/client", clientAuthRouter);
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
-// Serve the React app in production. This is registered unconditionally,
-// outside of any database setup — a Supabase problem should never take
-// down the ability to load the site itself.
-if (process.env.NODE_ENV === "production") {
+// Serve the React app in production — but NOT on Vercel, because Vercel
+// serves the static `dist/` output directory on its own CDN edge.
+if (process.env.NODE_ENV === "production" && !IS_VERCEL) {
   const clientDist = path.resolve(__dirname, "../../client/dist");
   app.use(express.static(clientDist));
   app.get("*", (req, res) => {
@@ -40,14 +41,15 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+// Only start the HTTP listener when running as a standalone server (local dev
+// or Render). On Vercel the platform provides its own listener.
+if (!IS_VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
 
-// Database setup runs AFTER the server is already listening and serving
-// pages. If Supabase isn't configured yet, this logs a clear, loud warning
-// but never kills the process — the site stays up, and only the DB-backed
-// routes (lead submission, admin login) will 500 until this is fixed.
+// Database setup — runs once per cold start on Vercel, or on boot locally.
 (async () => {
   try {
     await ensureTables();
