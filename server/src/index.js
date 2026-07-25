@@ -6,16 +6,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import leadsRouter from "./routes/leads.js";
 import adminRouter from "./routes/admin.js";
-import "./db.js";
+import { seedAdmin } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 
-if (!process.env.JWT_SECRET || !process.env.ADMIN_PASSWORD) {
+if (!process.env.JWT_SECRET) {
   console.warn(
-    "\u26a0\ufe0f  JWT_SECRET or ADMIN_PASSWORD not set \u2014 copy server/.env.example to server/.env and fill them in."
+    "⚠️  JWT_SECRET not set — copy server/.env.example to server/.env and fill it in."
   );
 }
 
@@ -36,6 +36,9 @@ if (process.env.NODE_ENV === "production") {
     res.sendFile(path.join(clientDist, "index.html"));
   });
 }
+
+// Seed first admin user if none exist
+seedAdmin();
 
 if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
   app.listen(PORT, () => {

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.js";
 
 export default function AdminLogin() {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -13,7 +14,7 @@ export default function AdminLogin() {
     setError("");
     setLoading(true);
     try {
-      await api.login(password);
+      await api.login(username, password);
       navigate("/admin");
     } catch (err) {
       setError(err.message || "Login failed");
@@ -30,6 +31,20 @@ export default function AdminLogin() {
       >
         <h1 className="text-xl font-semibold text-slate-900">Admin login</h1>
         <div className="mt-6">
+          <label htmlFor="username" className="block text-sm font-medium text-slate-700">
+            Username
+          </label>
+          <input
+            id="username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+            autoFocus
+            autoComplete="username"
+          />
+        </div>
+        <div className="mt-4">
           <label htmlFor="password" className="block text-sm font-medium text-slate-700">
             Password
           </label>
@@ -39,7 +54,7 @@ export default function AdminLogin() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-            autoFocus
+            autoComplete="current-password"
           />
         </div>
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

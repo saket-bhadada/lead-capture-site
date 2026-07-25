@@ -23,8 +23,8 @@ export const api = {
   submitLead: (payload) =>
     request("/api/leads", { method: "POST", body: JSON.stringify(payload) }),
 
-  login: (password) =>
-    request("/api/admin/login", { method: "POST", body: JSON.stringify({ password }) }),
+  login: (username, password) =>
+    request("/api/admin/login", { method: "POST", body: JSON.stringify({ username, password }) }),
 
   logout: () => request("/api/admin/logout", { method: "POST" }),
 
