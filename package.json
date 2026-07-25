@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev": "concurrently -n CLIENT,SERVER -c blue,green \"npm run dev -w client\" \"npm run dev -w server\"",
-    "build": "npm run build -w client",
+    "build": "npm run build -w client && node -e \"require('fs').cpSync('client/dist', 'dist', { recursive: true })\"",
     "start": "node server/src/index.js"
   },
   "devDependencies": {
