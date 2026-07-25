@@ -44,4 +44,6 @@ export const api = {
 
   updateStatus: (id, status) =>
     request(`/api/leads/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+
+  checkHealth: () => request("/api/health"),
 };

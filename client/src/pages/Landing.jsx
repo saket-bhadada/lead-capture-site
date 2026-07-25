@@ -7,10 +7,10 @@ export default function Landing() {
       {/* Navigation Header */}
       <header className="flex items-center justify-end gap-4 p-6">
         <Link 
-          to="/test" 
+          to="/health" 
           className="text-sm font-medium text-slate-500 hover:text-slate-900"
         >
-          API Test
+          System Health
         </Link>
         <Link 
           to="/admin/login" 
