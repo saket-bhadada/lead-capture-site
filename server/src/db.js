@@ -76,6 +76,18 @@ export async function getClientLeads(clientId) {
   return data;
 }
 
+export async function updateLeadStatus(id, status) {
+  const db = requireSupabase();
+  const { data, error } = await db
+    .from("leads")
+    .update({ status })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 // ─── Client user helpers ───────────────────────────────────────────────────
 
 export async function getClientByEmail(email) {
