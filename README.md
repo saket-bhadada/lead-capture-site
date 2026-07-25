@@ -187,24 +187,22 @@ Every admin route (`GET /api/leads`, `PATCH /api/leads/:id`, etc.) has middlewar
 
 ## Deployment
 
+This repository is configured for a **single-service deployment** on Render. The Express server serves both the API and the built React frontend.
+
 ### Environment Variables
 
-**Server (set on your hosting platform):**
+Set these in your Render dashboard when creating the Web Service:
 
 | Variable | Description |
 |---|---|
-| `NODE_ENV` | Set to `production` |
+| `NODE_ENV` | `production` |
+| `VITE_API_URL` | leave empty (`""`) for single-service deployment |
 | `SUPABASE_URL` | Your Supabase project URL |
 | `SUPABASE_SECRET_KEY` | Supabase service role key |
-| `JWT_SECRET` | Long random string (`openssl rand -hex 32`) |
+| `JWT_SECRET` | Render will auto-generate this via `render.yaml` |
+| `CLIENT_ORIGIN` | *See note below* |
 
-> **Note:** `ADMIN_PASSWORD` is no longer used. The first admin is auto-seeded on startup.
-
-**Client (set on Vercel or in `client/.env`):**
-
-| Variable | Description |
-|---|---|
-| `VITE_API_URL` | The deployed server URL (e.g., `https://mysite.onrender.com`) |
+> **Note on `CLIENT_ORIGIN`:** This controls CORS. It cannot be known before the first deploy because Render assigns the URL. **After the first successful deploy**, go into the Render dashboard, set `CLIENT_ORIGIN` to your actual assigned URL (e.g., `https://lead-capture-site.onrender.com`), and redeploy.
 
 ### First Admin Credentials
 
@@ -213,13 +211,11 @@ On server startup, if no admin users exist, the server will:
 2. Create an `admin` user with that password (bcrypt hashed)
 3. Log the credentials to the console
 
-Check your deployment logs (Render/Vercel/Railway dashboard) for the credentials on first deploy.
+Check your Render deployment logs for the credentials on first deploy.
 
 ### Hosting Options
 
-- **Vercel** (free, no credit card) — import GitHub repo, set env vars, deploy
-- **Render** (free tier) — Web Service with GitHub auto-deploy
-- **Railway** (free $5 credit/month) — GitHub integration, auto-deploys on push
+- **Render** (free tier) — Web Service with GitHub auto-deploy. Simply connect your GitHub repository to Render and use the provided `render.yaml` blueprint.
 
 ---
 

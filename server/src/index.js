@@ -4,10 +4,6 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import leadsRouter from "./routes/leads.js";
-import adminRouter from "./routes/admin.js";
-import { seedAdmin } from "./db.js";
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,22 +19,32 @@ app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
-app.use("/api/leads", leadsRouter);
-app.use("/api/admin", adminRouter);
+try {
+  const { default: leadsRouter } = await import("./routes/leads.js");
+  const { default: adminRouter } = await import("./routes/admin.js");
+  const { seedAdmin } = await import("./db.js");
 
-app.get("/api/health", (req, res) => res.json({ ok: true }));
+  app.use("/api/leads", leadsRouter);
+  app.use("/api/admin", adminRouter);
 
-// Serve frontend in production
-if (process.env.NODE_ENV === "production") {
-  const clientDist = path.resolve(__dirname, "../../client/dist");
-  app.use(express.static(clientDist));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(clientDist, "index.html"));
-  });
+  app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+  // Serve frontend in production
+  if (process.env.NODE_ENV === "production") {
+    const clientDist = path.resolve(__dirname, "../../client/dist");
+    app.use(express.static(clientDist));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(clientDist, "index.html"));
+    });
+  }
+
+  // Seed first admin user if none exist
+  seedAdmin();
+
+} catch (error) {
+  console.error("Startup Error:", error.message);
+  process.exit(1);
 }
-
-// Seed first admin user if none exist
-seedAdmin();
 
 if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
   app.listen(PORT, () => {

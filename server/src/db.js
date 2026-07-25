@@ -7,10 +7,10 @@ const SUPABASE_KEY =
   process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error(
-    "[Supabase] SUPABASE_URL or SUPABASE_SECRET_KEY / SUPABASE_PUBLISHABLE_KEY not set in .env"
+  throw new Error(
+    "SUPABASE_URL or SUPABASE_SECRET_KEY / SUPABASE_PUBLISHABLE_KEY not set. " +
+    "Set these in your hosting platform's environment variables."
   );
-  process.exit(1);
 }
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);

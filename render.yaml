@@ -7,11 +7,13 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: VITE_API_URL
+        value: ""
+      - key: CLIENT_ORIGIN
+        sync: false   # set to the deployed Render URL after first deploy, e.g. https://lead-capture-site.onrender.com
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: ADMIN_PASSWORD
-        sync: false
