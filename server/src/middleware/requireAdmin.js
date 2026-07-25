@@ -12,6 +12,10 @@ export async function requireAdmin(req, res, next) {
     // 1. Verify JWT signature and expiry
     const payload = jwt.verify(token, process.env.JWT_SECRET);
 
+    if (payload.role && payload.role !== "admin") {
+      return res.status(403).json({ error: "Access denied: Admin role required" });
+    }
+
     // 2. Verify session still exists in DB (not revoked via logout)
     const session = await getSessionById(payload.session_id);
     if (!session) {
@@ -22,6 +26,7 @@ export async function requireAdmin(req, res, next) {
     req.user = {
       admin_id: payload.admin_id,
       session_id: payload.session_id,
+      role: "admin",
     };
 
     next();

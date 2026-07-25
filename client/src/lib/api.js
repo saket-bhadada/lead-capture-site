@@ -3,7 +3,7 @@ const API_URL =
 
 async function request(path, options = {}) {
   const res = await fetch(`${API_URL}${path}`, {
-    credentials: "include", // required for the admin_token cookie to be sent/set cross-origin
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     ...options,
   });
@@ -21,9 +21,24 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  // Public Lead Submission
   submitLead: (payload) =>
     request("/api/leads", { method: "POST", body: JSON.stringify(payload) }),
 
+  // Client Auth & Portal APIs
+  clientLogin: (email, password) =>
+    request("/api/client/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+
+  clientSignup: (name, email, password) =>
+    request("/api/client/signup", { method: "POST", body: JSON.stringify({ name, email, password }) }),
+
+  clientLogout: () => request("/api/client/logout", { method: "POST" }),
+
+  clientSession: () => request("/api/client/session"),
+
+  getMyLeads: () => request("/api/leads/my-leads"),
+
+  // Admin Auth & Management APIs
   login: (username, password) =>
     request("/api/admin/login", { method: "POST", body: JSON.stringify({ username, password }) }),
 

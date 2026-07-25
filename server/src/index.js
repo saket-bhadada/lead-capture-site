@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import leadsRouter from "./routes/leads.js";
 import adminRouter from "./routes/admin.js";
+import clientAuthRouter from "./routes/clientAuth.js";
 import { seedAdmin, ensureTables, deleteExpiredSessions } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +26,7 @@ app.use(cookieParser());
 
 app.use("/api/leads", leadsRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/client", clientAuthRouter);
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
 // Serve the React app in production. This is registered unconditionally,

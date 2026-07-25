@@ -65,12 +65,46 @@ export async function getLeads({ search, status } = {}) {
   return data;
 }
 
-export async function updateLeadStatus(id, status) {
+export async function getClientLeads(clientId) {
   const db = requireSupabase();
   const { data, error } = await db
     .from("leads")
-    .update({ status })
+    .select("*")
+    .eq("client_id", clientId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+// ─── Client user helpers ───────────────────────────────────────────────────
+
+export async function getClientByEmail(email) {
+  const db = requireSupabase();
+  const { data, error } = await db
+    .from("client_users")
+    .select("*")
+    .eq("email", email)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
+export async function getClientById(id) {
+  const db = requireSupabase();
+  const { data, error } = await db
+    .from("client_users")
+    .select("*")
     .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
+export async function insertClient({ id, email, name, password_hash }) {
+  const db = requireSupabase();
+  const { data, error } = await db
+    .from("client_users")
+    .insert({ id, email, name, password_hash })
     .select()
     .single();
   if (error) throw error;

@@ -1,15 +1,15 @@
 import { Router } from "express";
 import crypto from "node:crypto";
-import { insertLead, getLeadById, getLeads, updateLeadStatus } from "../db.js";
-import { leadSchema, statusUpdateSchema, STATUSES } from "shared/leadSchema.js";
+import jwt from "jsonwebtoken";
+import { insertLead, getLeadById, getLeads, getClientLeads, updateLeadStatus } from "../db.js";
+import { leadSchema, statusUpdateSchema } from "shared/leadSchema.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
+import { requireClient } from "../middleware/requireClient.js";
 
 const router = Router();
 
-// POST /api/leads - public submission endpoint
+// POST /api/leads - submission endpoint (public or attached to client)
 router.post("/", async (req, res) => {
-  // Honeypot: real visitors never fill this field in. Bots that fill every
-  // field usually do. Pretend success so the bot doesn't learn anything.
   if (req.body?.company) {
     return res.status(201).json({ ok: true });
   }
@@ -19,11 +19,34 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ errors: parsed.error.flatten().fieldErrors });
   }
 
+  // Check if client is logged in
+  let clientId = null;
+  const clientToken = req.cookies?.client_token;
+  if (clientToken) {
+    try {
+      const payload = jwt.verify(clientToken, process.env.JWT_SECRET);
+      if (payload.role === "client") {
+        clientId = payload.client_id;
+      }
+    } catch {
+      // Ignore token error for public submission
+    }
+  }
+
   const { name, email, budget_range, message } = parsed.data;
   const id = crypto.randomUUID();
   const created_at = new Date().toISOString();
 
-  const leadData = { id, name, email, budget_range, message, status: "New", created_at };
+  const leadData = {
+    id,
+    name,
+    email,
+    budget_range,
+    message,
+    status: "New",
+    created_at,
+    ...(clientId ? { client_id: clientId } : {}),
+  };
 
   try {
     const lead = await insertLead(leadData);
@@ -31,6 +54,17 @@ router.post("/", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to insert lead" });
+  }
+});
+
+// GET /api/leads/my-leads - client only, get submissions for current client
+router.get("/my-leads", requireClient, async (req, res) => {
+  try {
+    const leads = await getClientLeads(req.user.id);
+    res.json(leads);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to retrieve client leads" });
   }
 });
 

@@ -5,26 +5,12 @@ import { STATUSES } from "shared/leadSchema.js";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [checkingSession, setCheckingSession] = useState(true);
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const debounceRef = useRef(null);
-
-  useEffect(() => {
-    api
-      .session()
-      .then((res) => {
-        if (!res.authenticated) {
-          navigate("/admin/login");
-        } else {
-          setCheckingSession(false);
-        }
-      })
-      .catch(() => navigate("/admin/login"));
-  }, [navigate]);
 
   const fetchLeads = useCallback(
     async (opts) => {
@@ -47,10 +33,9 @@ export default function AdminDashboard() {
   );
 
   useEffect(() => {
-    if (checkingSession) return;
     fetchLeads({ search, status: statusFilter });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkingSession, statusFilter]);
+  }, [statusFilter]);
 
   const onSearchChange = (value) => {
     setSearch(value);
@@ -66,48 +51,36 @@ export default function AdminDashboard() {
     try {
       await api.updateStatus(id, newStatus);
     } catch {
-      setLeads(prev); // roll back on failure
+      setLeads(prev);
       setErrorMsg("Couldn't update status. Try again.");
     }
   };
 
-  const onLogout = async () => {
-    await api.logout();
-    navigate("/admin/login");
-  };
-
-  if (checkingSession) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-slate-500">
-        Checking session...
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-slate-900">Leads</h1>
-          <button onClick={onLogout} className="text-sm font-medium text-slate-500 hover:text-slate-900">
-            Log out
-          </button>
-        </div>
-
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+    <div className="space-y-6">
+      {/* Search & Filter Header Bar */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="relative flex-1 max-w-md">
+          <svg className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
           <input
             type="text"
-            placeholder="Search by name, email, or message..."
+            placeholder="Search leads by name or email..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+            className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-semibold text-slate-500">Status:</label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+            className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            <option value="">All statuses</option>
+            <option value="">All Statuses ({leads.length})</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -115,36 +88,37 @@ export default function AdminDashboard() {
             ))}
           </select>
         </div>
+      </div>
 
-        {errorMsg && <p className="mt-4 text-sm text-red-600">{errorMsg}</p>}
+      {errorMsg && <p className="text-xs text-red-600 font-semibold">{errorMsg}</p>}
 
-        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          {loading ? (
-            <div className="p-10 text-center text-slate-500">Loading...</div>
-          ) : leads.length === 0 ? (
-            <div className="p-10 text-center text-slate-500">
-              {search || statusFilter ? "No leads match your search." : "No leads yet."}
-            </div>
-          ) : (
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Name</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium">Budget</th>
-                  <th className="px-4 py-3 font-medium">Message</th>
-                  <th className="px-4 py-3 font-medium">Submitted</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {leads.map((lead) => (
-                  <LeadRow key={lead.id} lead={lead} onStatusChange={onStatusChange} />
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+      {/* Compact Dense Data Table */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+        {loading ? (
+          <div className="p-12 text-center text-xs font-medium text-slate-500">Loading leads database...</div>
+        ) : leads.length === 0 ? (
+          <div className="p-12 text-center text-xs font-medium text-slate-500">
+            {search || statusFilter ? "No leads match your active search filters." : "No platform leads recorded yet."}
+          </div>
+        ) : (
+          <table className="w-full text-left text-xs">
+            <thead className="border-b border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider font-bold">
+              <tr>
+                <th className="px-5 py-3.5">Name</th>
+                <th className="px-5 py-3.5">Email</th>
+                <th className="px-5 py-3.5">Budget</th>
+                <th className="px-5 py-3.5">Message Inquiry</th>
+                <th className="px-5 py-3.5">Date Submitted</th>
+                <th className="px-5 py-3.5 text-right">Status Control</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {leads.map((lead) => (
+                <LeadRow key={lead.id} lead={lead} onStatusChange={onStatusChange} />
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
@@ -152,30 +126,36 @@ export default function AdminDashboard() {
 
 function LeadRow({ lead, onStatusChange }) {
   const [expanded, setExpanded] = useState(false);
-  const isLong = lead.message.length > 60;
-  const shown = isLong && !expanded ? `${lead.message.slice(0, 60)}...` : lead.message;
+  const isLong = lead.message.length > 70;
+  const shown = isLong && !expanded ? `${lead.message.slice(0, 70)}...` : lead.message;
 
   return (
-    <tr className="align-top">
-      <td className="px-4 py-3 text-slate-900">{lead.name}</td>
-      <td className="px-4 py-3 text-slate-600">{lead.email}</td>
-      <td className="px-4 py-3 text-slate-600">{lead.budget_range}</td>
-      <td className="max-w-xs px-4 py-3 text-slate-600">
+    <tr className="hover:bg-slate-50/80 transition">
+      <td className="px-5 py-4 font-bold text-slate-900">{lead.name}</td>
+      <td className="px-5 py-4 text-slate-600 font-mono text-[11px]">{lead.email}</td>
+      <td className="px-5 py-4 text-slate-700">
+        <span className="inline-block bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md font-semibold text-[11px]">
+          {lead.budget_range}
+        </span>
+      </td>
+      <td className="max-w-md px-5 py-4 text-slate-600 leading-normal">
         {shown}
         {isLong && (
-          <button onClick={() => setExpanded((v) => !v)} className="ml-1 text-slate-400 underline">
+          <button onClick={() => setExpanded((v) => !v)} className="ml-1 text-indigo-600 font-semibold underline">
             {expanded ? "less" : "more"}
           </button>
         )}
       </td>
-      <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+      <td className="whitespace-nowrap px-5 py-4 text-slate-400 font-mono text-[11px]">
         {new Date(lead.created_at).toLocaleDateString()}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-5 py-4 text-right">
         <select
           value={lead.status}
           onChange={(e) => onStatusChange(lead.id, e.target.value)}
-          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${statusStyles(lead.status)}`}
+          className={`rounded-full border px-3 py-1 text-[11px] font-bold outline-none cursor-pointer ${statusStyles(
+            lead.status
+          )}`}
         >
           {STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -191,12 +171,12 @@ function LeadRow({ lead, onStatusChange }) {
 function statusStyles(status) {
   switch (status) {
     case "New":
-      return "border-blue-200 bg-blue-50 text-blue-700";
+      return "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100";
     case "Contacted":
-      return "border-amber-200 bg-amber-50 text-amber-700";
+      return "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100";
     case "Closed":
-      return "border-slate-200 bg-slate-100 text-slate-600";
+      return "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-600";
+      return "border-slate-300 bg-slate-50 text-slate-600";
   }
 }

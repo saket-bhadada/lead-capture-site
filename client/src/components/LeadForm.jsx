@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { leadSchema, BUDGET_RANGES } from "shared/leadSchema.js";
 import { api } from "../lib/api.js";
 
-export default function LeadForm() {
+export default function LeadForm({ onSuccess, defaultEmail = "", defaultName = "" }) {
   const [status, setStatus] = useState("idle"); // idle | success
   const [serverError, setServerError] = useState("");
 
@@ -15,7 +15,7 @@ export default function LeadForm() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(leadSchema),
-    defaultValues: { name: "", email: "", budget_range: "", message: "", company: "" },
+    defaultValues: { name: defaultName, email: defaultEmail, budget_range: "", message: "", company: "" },
   });
 
   const onSubmit = async (values) => {
@@ -24,6 +24,7 @@ export default function LeadForm() {
       await api.submitLead(values);
       setStatus("success");
       reset();
+      if (onSuccess) onSuccess();
     } catch (err) {
       setServerError(err.message || "Something went wrong. Please try again.");
     }
